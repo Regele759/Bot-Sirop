@@ -14,7 +14,97 @@ OWNER_ID = 1167122755800547483  # Direct ID - hardcoded
 # Set up bot with command prefix
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
+
+# Ticket counter
+ticket_counter = {}
+
+# Custom Select Menu for Tickets
+class TicketSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Help/Question", value="help", emoji="❓"),
+            discord.SelectOption(label="Purchase", value="purchase", emoji="🛒"),
+            discord.SelectOption(label="Claim Reward", value="reward", emoji="🎁"),
+        ]
+        super().__init__(placeholder="Select a ticket type...", options=options, min_values=1, max_values=1)
+    
+    async def callback(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        user = interaction.user
+        ticket_type = self.values[0]
+        
+        # Initialize counter for this guild
+        if guild.id not in ticket_counter:
+            ticket_counter[guild.id] = 0
+        
+        ticket_counter[guild.id] += 1
+        ticket_number = ticket_counter[guild.id]
+        
+        # Create ticket channel name based on type
+        type_names = {
+            "help": "help",
+            "purchase": "purchase",
+            "reward": "reward"
+        }
+        
+        channel_name = f"ticket-{type_names[ticket_type]}-{ticket_number}"
+        
+        # Create the ticket channel
+        try:
+            # Get or create a category for tickets
+            category = None
+            for cat in guild.categories:
+                if cat.name.lower() == "tickets":
+                    category = cat
+                    break
+            
+            # Create permissions for the channel
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+                guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+            }
+            
+            # Create the channel
+            ticket_channel = await guild.create_text_channel(
+                channel_name,
+                category=category,
+                overwrites=overwrites
+            )
+            
+            # Send ticket info embed
+            embed = discord.Embed(
+                title=f"🎫 Ticket #{ticket_number}",
+                description=f"**Type:** {ticket_type.upper()}\n**User:** {user.mention}",
+                color=discord.Color.blue()
+            )
+            embed.add_field(name="Status", value="🟢 Open", inline=False)
+            embed.add_field(name="Instructions", value="Describe your issue or request below.", inline=False)
+            embed.set_footer(text=f"Ticket ID: {ticket_number}")
+            
+            await ticket_channel.send(embed=embed)
+            await ticket_channel.send(f"Welcome {user.mention}! A staff member will assist you shortly.")
+            
+            # Respond to user
+            await interaction.response.send_message(
+                f"✅ Ticket created! Check {ticket_channel.mention}",
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            print(f"Error creating ticket: {e}")
+            await interaction.response.send_message(
+                "❌ Error creating ticket. Please try again.",
+                ephemeral=True
+            )
+
+# View class to hold the select menu
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(TicketSelect())
 
 @bot.event
 async def on_ready():
@@ -68,13 +158,14 @@ async def help_command(ctx):
     """Display custom help information"""
     embed = discord.Embed(
         title="🎨 Bot-Sirop Help",
-        description="A Discord bot that generates random colors",
+        description="A Discord bot that generates random colors and manages support tickets",
         color=discord.Color.blue()
     )
     embed.add_field(name="!color [count]", value="Generate random colors (default: 5, max: 20)", inline=False)
     embed.add_field(name="!colors", value="Show all available colors", inline=False)
     embed.add_field(name="!ping", value="Check bot latency", inline=False)
     embed.add_field(name="!dmsiropel", value="Request help from Siropel", inline=False)
+    embed.add_field(name="!ticketpanel", value="Create a ticket support panel", inline=False)
     
     await ctx.send(embed=embed)
 
@@ -107,6 +198,24 @@ async def dmsiropel_command(ctx):
     except Exception as e:
         print(f"Error sending help notification: {e}")
         await ctx.send("❌ Error sending help request. Please try again later.")
+
+@bot.command(name='ticketpanel', help='Create a support ticket panel')
+async def ticketpanel_command(ctx):
+    """
+    Create a ticket panel with select menu
+    Usage: !ticketpanel
+    """
+    embed = discord.Embed(
+        title="🎫 Support Ticket System",
+        description="Select a ticket type below to get started!",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="❓ Help/Question", value="Ask a question or get help", inline=False)
+    embed.add_field(name="🛒 Purchase", value="Purchase-related inquiries", inline=False)
+    embed.add_field(name="🎁 Claim Reward", value="Claim your rewards", inline=False)
+    
+    await ctx.send(embed=embed, view=TicketView())
+    await ctx.message.delete()  # Optional: delete the command message
 
 # Run the bot
 if __name__ == "__main__":
