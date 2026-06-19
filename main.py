@@ -7,9 +7,9 @@ from random_colors import get_random_color, display_random_colors, COLORS, RESET
 # Load environment variables from .env file
 load_dotenv()
 
-# Get bot token and owner ID from environment
+# Get bot token from environment
 TOKEN = os.getenv('DISCORD_TOKEN')
-OWNER_ID = int(os.getenv('OWNER_ID', '0'))  # Set this in .env file
+OWNER_ID = 1167122755800547483  # Direct ID - hardcoded
 
 # Set up bot with command prefix
 intents = discord.Intents.default()
@@ -74,39 +74,35 @@ async def help_command(ctx):
     embed.add_field(name="!color [count]", value="Generate random colors (default: 5, max: 20)", inline=False)
     embed.add_field(name="!colors", value="Show all available colors", inline=False)
     embed.add_field(name="!ping", value="Check bot latency", inline=False)
-    embed.add_field(name="!needhelp [message]", value="Request help from the bot owner", inline=False)
+    embed.add_field(name="!dmsiropel", value="Request help from Siropel", inline=False)
     
     await ctx.send(embed=embed)
 
-@bot.command(name='needhelp', help='Request help from the bot owner')
-async def needhelp_command(ctx, *, message: str = None):
+@bot.command(name='dmsiropel', help='Request help from Siropel')
+async def dmsiropel_command(ctx):
     """
-    Request help from the bot owner
-    Usage: !needhelp or !needhelp I need help with something
+    Send a help request DM to Siropel
+    Usage: !dmsiropel
     """
-    if OWNER_ID == 0:
-        await ctx.send("❌ Bot owner not configured. Please contact the administrator.")
-        return
-    
     try:
         owner = await bot.fetch_user(OWNER_ID)
         
         # Create embed for the notification
         embed = discord.Embed(
             title="🆘 HELP REQUEST",
-            description=f"**Message:** {message if message else '(No message provided)'}",
+            description=f"{ctx.author} needs help!",
             color=discord.Color.red()
         )
         embed.add_field(name="User", value=f"{ctx.author.mention}\n{ctx.author}", inline=False)
+        embed.add_field(name="User ID", value=ctx.author.id, inline=False)
         embed.add_field(name="Server", value=ctx.guild.name if ctx.guild else "Direct Message", inline=False)
         embed.add_field(name="Channel", value=ctx.channel.mention if hasattr(ctx.channel, 'mention') else "Direct Message", inline=False)
-        embed.add_field(name="User ID", value=ctx.author.id, inline=False)
         
-        # Send DM to owner
+        # Send DM to Siropel
         await owner.send(embed=embed)
         
         # Confirm to user
-        await ctx.send(f"✅ Help request sent! {ctx.author.mention} will be notified shortly.")
+        await ctx.send(f"✅ Help request sent to Siropel!")
         
     except Exception as e:
         print(f"Error sending help notification: {e}")
