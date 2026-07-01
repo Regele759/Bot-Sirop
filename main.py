@@ -21,6 +21,7 @@ PAYMENT_ADDRESSES = {
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.guilds = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # Ticket counter
@@ -156,6 +157,45 @@ async def on_ready():
     """Called when bot successfully logs in"""
     print(f'{bot.user} has connected to Discord!')
     print('------')
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    """Detect when a member boosts the server"""
+    # Check if the member just started boosting
+    if before.premium_since is None and after.premium_since is not None:
+        # Member just boosted the server
+        guild = after.guild
+        
+        # Try to find a general or announcements channel
+        channel = None
+        for ch in guild.text_channels:
+            if ch.name in ['general', 'announcements', 'boost', 'boosts']:
+                if ch.permissions_for(guild.me).send_messages:
+                    channel = ch
+                    break
+        
+        # If no specific channel found, use the first available text channel
+        if channel is None:
+            for ch in guild.text_channels:
+                if ch.permissions_for(guild.me).send_messages:
+                    channel = ch
+                    break
+        
+        if channel:
+            # Create embed with boost message
+            embed = discord.Embed(
+                title="⭐ Thank You for Boosting!",
+                description="Iti multumim pentru boost ⭐ Speram sa ai o zi buna !",
+                color=discord.Color.pink()
+            )
+            embed.set_author(name=after.name, icon_url=after.avatar.url)
+            embed.set_image(url="https://cdn.discordapp.com/attachments/1/default_boost_image.png")
+            
+            # Send the message with the Discord boost card image
+            await channel.send(
+                embed=embed,
+                file=discord.File("https://media.discordapp.net/attachments/1/boost_card.png") if os.path.exists("boost_card.png") else None
+            )
 
 @bot.command(name='color', help='Generate random colors')
 async def color_command(ctx, count: int = 5):
