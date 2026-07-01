@@ -11,6 +11,7 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 OWNER_ID = 1167122755800547483  # Direct ID - hardcoded
 BOOST_CHANNEL_ID = 1464032809646817373  # Channel for boost messages
+BAN_ROLE_ID = 1479240139753390223  # Role that can use ban command
 
 # Payment addresses configuration
 PAYMENT_ADDRESSES = {
@@ -27,6 +28,9 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 # Ticket counter
 ticket_counter = {}
+
+# Pending bans to track for approval
+pending_bans = {}
 
 # Custom Select Menu for Tickets
 class TicketSelect(discord.ui.Select):
@@ -141,6 +145,67 @@ class PaymentSelect(discord.ui.Select):
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+# Ban Approval Buttons
+class BanApprovalView(discord.ui.View):
+    def __init__(self, ban_id: str, bot_instance):
+        super().__init__(timeout=None)
+        self.ban_id = ban_id
+        self.bot = bot_instance
+    
+    @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.green)
+    async def accept_ban(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != str(OWNER_ID):
+            await interaction.response.send_message("❌ You don't have permission to approve bans!", ephemeral=True)
+            return
+        
+        if self.ban_id not in pending_bans:
+            await interaction.response.send_message("❌ This ban request has already been processed!", ephemeral=True)
+            return
+        
+        ban_data = pending_bans[self.ban_id]
+        user_id = ban_data['user_id']
+        guild_id = ban_data['guild_id']
+        reason = ban_data['reason']
+        
+        try:
+            guild = self.bot.get_guild(guild_id)
+            if guild:
+                user = await self.bot.fetch_user(user_id)
+                await guild.ban(user, reason=reason)
+                
+                await interaction.response.send_message(f"✅ **Ban Accepted!**\n**User:** {user}\n**Reason:** {reason}", ephemeral=True)
+                
+                # Remove from pending
+                del pending_bans[self.ban_id]
+            else:
+                await interaction.response.send_message("❌ Could not find guild!", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error banning user: {e}", ephemeral=True)
+            print(f"Error banning user: {e}")
+    
+    @discord.ui.button(label="❌ Decline", style=discord.ButtonStyle.red)
+    async def decline_ban(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if str(interaction.user.id) != str(OWNER_ID):
+            await interaction.response.send_message("❌ You don't have permission to decline bans!", ephemeral=True)
+            return
+        
+        if self.ban_id not in pending_bans:
+            await interaction.response.send_message("❌ This ban request has already been processed!", ephemeral=True)
+            return
+        
+        ban_data = pending_bans[self.ban_id]
+        user_id = ban_data['user_id']
+        
+        try:
+            user = await bot.fetch_user(user_id)
+            await interaction.response.send_message(f"❌ **Ban Declined!**\n**User:** {user} will not be banned.", ephemeral=True)
+            
+            # Remove from pending
+            del pending_bans[self.ban_id]
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
+            print(f"Error: {e}")
+
 # View class to hold the ticket select menu
 class TicketView(discord.ui.View):
     def __init__(self):
@@ -183,6 +248,75 @@ async def on_member_update(before: discord.Member, after: discord.Member):
                 print(f"Boost thank you message sent for {after.name}")
     except Exception as e:
         print(f"Error in boost handler: {e}")
+
+@bot.tree.command(name="ban", description="Ban a user from the server (requires special role)")
+async def ban_command(interaction: discord.Interaction, user: discord.User, reason: str):
+    """Ban a user with admin approval"""
+    # Check if user has the required role
+    ban_role = interaction.guild.get_role(BAN_ROLE_ID)
+    
+    if ban_role not in interaction.user.roles:
+        await interaction.response.send_message(
+            "❌ You don't have permission to use this command!",
+            ephemeral=True
+        )
+        return
+    
+    # Check if user is trying to ban themselves
+    if user.id == interaction.user.id:
+        await interaction.response.send_message(
+            "❌ You can't ban yourself!",
+            ephemeral=True
+        )
+        return
+    
+    # Check if user is trying to ban the bot
+    if user.id == bot.user.id:
+        await interaction.response.send_message(
+            "❌ You can't ban the bot!",
+            ephemeral=True
+        )
+        return
+    
+    try:
+        # Generate unique ID for this ban request
+        ban_id = f"{interaction.guild.id}_{user.id}_{interaction.created_at.timestamp()}"
+        
+        # Store ban data
+        pending_bans[ban_id] = {
+            'user_id': user.id,
+            'guild_id': interaction.guild.id,
+            'reason': reason,
+            'requested_by': interaction.user.id
+        }
+        
+        # Create embed for admin
+        embed = discord.Embed(
+            title="🔨 Ban Request for Approval",
+            description=f"A user has requested a ban. Please review and approve or decline.",
+            color=discord.Color.orange()
+        )
+        embed.add_field(name="User to Ban", value=f"{user} (ID: {user.id})", inline=False)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        embed.add_field(name="Requested By", value=f"{interaction.user} (ID: {interaction.user.id})", inline=False)
+        embed.add_field(name="Guild", value=f"{interaction.guild.name}", inline=False)
+        
+        # Send DM to owner with approval buttons
+        owner = await bot.fetch_user(OWNER_ID)
+        await owner.send(embed=embed, view=BanApprovalView(ban_id, bot))
+        
+        await interaction.response.send_message(
+            f"✅ Ban request submitted for {user}!\n**Reason:** {reason}\n\nAwaiting admin approval...",
+            ephemeral=True
+        )
+        print(f"Ban request submitted for {user} by {interaction.user}")
+        
+    except Exception as e:
+        await interaction.response.send_message(
+            f"❌ Error submitting ban request: {e}",
+            ephemeral=True
+        )
+        print(f"Error in ban command: {e}")
 
 @bot.command(name='color', help='Generate random colors')
 async def color_command(ctx, count: int = 5):
@@ -239,6 +373,7 @@ async def help_command(ctx):
     embed.add_field(name="!dmsiropel", value="Request help from Siropel", inline=False)
     embed.add_field(name="!ticketpanel", value="Create a ticket support panel", inline=False)
     embed.add_field(name="!trade", value="Start a trade and select payment method", inline=False)
+    embed.add_field(name="/ban <user> <reason>", value="Ban a user (requires special role)", inline=False)
     
     await ctx.send(embed=embed)
 
