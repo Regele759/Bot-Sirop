@@ -11,7 +11,7 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 OWNER_ID = 1167122755800547483  # Direct ID - hardcoded
 BOOST_CHANNEL_ID = 1464032809646817373  # Channel for boost messages
-BAN_ROLE_ID = 1479240139753390223  # Role that can use ban command
+BAN_ROLE_ID = 1479240139753390223  # Role that can request bans
 
 # Payment addresses configuration
 PAYMENT_ADDRESSES = {
@@ -249,9 +249,9 @@ async def on_member_update(before: discord.Member, after: discord.Member):
     except Exception as e:
         print(f"Error in boost handler: {e}")
 
-@bot.tree.command(name="ban", description="Ban a user from the server (requires special role)")
+@bot.tree.command(name="ban", description="Request to ban a user from the server")
 async def ban_command(interaction: discord.Interaction, user: discord.User, reason: str):
-    """Ban a user with admin approval"""
+    """Request a ban - sends DM to admin for approval"""
     # Check if user has the required role
     ban_role = interaction.guild.get_role(BAN_ROLE_ID)
     
@@ -292,21 +292,19 @@ async def ban_command(interaction: discord.Interaction, user: discord.User, reas
         
         # Create embed for admin
         embed = discord.Embed(
-            title="🔨 Ban Request for Approval",
-            description=f"A user has requested a ban. Please review and approve or decline.",
+            title="🔨 Ban Request",
+            description=f"A ban request has been submitted.",
             color=discord.Color.orange()
         )
         embed.add_field(name="User to Ban", value=f"{user} (ID: {user.id})", inline=False)
         embed.add_field(name="Reason", value=reason, inline=False)
-        embed.add_field(name="Requested By", value=f"{interaction.user} (ID: {interaction.user.id})", inline=False)
-        embed.add_field(name="Guild", value=f"{interaction.guild.name}", inline=False)
         
         # Send DM to owner with approval buttons
         owner = await bot.fetch_user(OWNER_ID)
         await owner.send(embed=embed, view=BanApprovalView(ban_id, bot))
         
         await interaction.response.send_message(
-            f"✅ Ban request submitted for {user}!\n**Reason:** {reason}\n\nAwaiting admin approval...",
+            f"✅ Ban request submitted for {user}!",
             ephemeral=True
         )
         print(f"Ban request submitted for {user} by {interaction.user}")
@@ -373,7 +371,7 @@ async def help_command(ctx):
     embed.add_field(name="!dmsiropel", value="Request help from Siropel", inline=False)
     embed.add_field(name="!ticketpanel", value="Create a ticket support panel", inline=False)
     embed.add_field(name="!trade", value="Start a trade and select payment method", inline=False)
-    embed.add_field(name="/ban <user> <reason>", value="Ban a user (requires special role)", inline=False)
+    embed.add_field(name="/ban <user> <reason>", value="Request a ban (requires special role)", inline=False)
     
     await ctx.send(embed=embed)
 
