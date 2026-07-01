@@ -11,6 +11,12 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 OWNER_ID = 1167122755800547483  # Direct ID - hardcoded
 
+# Payment addresses configuration
+PAYMENT_ADDRESSES = {
+    "paysafecard": "edileoediboss@gmail.com",
+    "ltc": "LU4tnmac98W2EjhuY1xqXRDMrSa6B55kph"
+}
+
 # Set up bot with command prefix
 intents = discord.Intents.default()
 intents.message_content = True
@@ -100,11 +106,50 @@ class TicketSelect(discord.ui.Select):
                 ephemeral=True
             )
 
-# View class to hold the select menu
+# Payment Select Menu for Trade
+class PaymentSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="Paysafecard", value="paysafecard", emoji="💳"),
+            discord.SelectOption(label="LTC", value="ltc", emoji="₿"),
+        ]
+        super().__init__(placeholder="Select payment method...", options=options, min_values=1, max_values=1)
+    
+    async def callback(self, interaction: discord.Interaction):
+        payment_method = self.values[0]
+        payment_address = PAYMENT_ADDRESSES.get(payment_method, "N/A")
+        
+        # Create embed with payment address
+        embed = discord.Embed(
+            title=f"💰 {payment_method.upper()} Payment Address",
+            description=f"Send your payment to the address below:",
+            color=discord.Color.gold()
+        )
+        embed.add_field(
+            name="Payment Address",
+            value=f"```{payment_address}```",
+            inline=False
+        )
+        embed.add_field(
+            name="Instructions",
+            value="Please copy the address above and send your payment. Once received, your order will be processed immediately.",
+            inline=False
+        )
+        embed.set_footer(text="Do not share this address with others.")
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# View class to hold the ticket select menu
 class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(TicketSelect())
+
+# View class to hold the payment select menu
+class PaymentView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(PaymentSelect())
 
 @bot.event
 async def on_ready():
@@ -166,6 +211,7 @@ async def help_command(ctx):
     embed.add_field(name="!ping", value="Check bot latency", inline=False)
     embed.add_field(name="!dmsiropel", value="Request help from Siropel", inline=False)
     embed.add_field(name="!ticketpanel", value="Create a ticket support panel", inline=False)
+    embed.add_field(name="!trade", value="Start a trade and select payment method", inline=False)
     
     await ctx.send(embed=embed)
 
@@ -216,6 +262,22 @@ async def ticketpanel_command(ctx):
     
     await ctx.send(embed=embed, view=TicketView())
     await ctx.message.delete()  # Optional: delete the command message
+
+@bot.command(name='trade', help='Start a trade and select payment method')
+async def trade_command(ctx):
+    """
+    Create a trade panel with payment method selection
+    Usage: !trade
+    """
+    embed = discord.Embed(
+        title="💱 Trade - Select Payment Method",
+        description="Choose your preferred payment method below to start the trade!",
+        color=discord.Color.gold()
+    )
+    embed.add_field(name="💳 Paysafecard", value="Pay with Paysafecard", inline=False)
+    embed.add_field(name="₿ LTC", value="Pay with Litecoin", inline=False)
+    
+    await ctx.send(embed=embed, view=PaymentView())
 
 # Run the bot
 if __name__ == "__main__":
