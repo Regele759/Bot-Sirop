@@ -10,6 +10,7 @@ load_dotenv()
 # Get bot token from environment
 TOKEN = os.getenv('DISCORD_TOKEN')
 OWNER_ID = 1167122755800547483  # Direct ID - hardcoded
+BOOST_CHANNEL_ID = 1464032809646817373  # Channel for boost messages
 
 # Payment addresses configuration
 PAYMENT_ADDRESSES = {
@@ -166,20 +167,8 @@ async def on_member_update(before: discord.Member, after: discord.Member):
         # Member just boosted the server
         guild = after.guild
         
-        # Try to find a general or announcements channel
-        channel = None
-        for ch in guild.text_channels:
-            if ch.name in ['general', 'announcements', 'boost', 'boosts']:
-                if ch.permissions_for(guild.me).send_messages:
-                    channel = ch
-                    break
-        
-        # If no specific channel found, use the first available text channel
-        if channel is None:
-            for ch in guild.text_channels:
-                if ch.permissions_for(guild.me).send_messages:
-                    channel = ch
-                    break
+        # Get the boost channel
+        channel = bot.get_channel(BOOST_CHANNEL_ID)
         
         if channel:
             # Create embed with boost message
@@ -188,14 +177,14 @@ async def on_member_update(before: discord.Member, after: discord.Member):
                 description="Iti multumim pentru boost ⭐ Speram sa ai o zi buna !",
                 color=discord.Color.pink()
             )
-            embed.set_author(name=after.name, icon_url=after.avatar.url)
-            embed.set_image(url="https://cdn.discordapp.com/attachments/1/default_boost_image.png")
+            embed.set_author(name=after.name, icon_url=after.avatar.url if after.avatar else None)
             
-            # Send the message with the Discord boost card image
-            await channel.send(
-                embed=embed,
-                file=discord.File("https://media.discordapp.net/attachments/1/boost_card.png") if os.path.exists("boost_card.png") else None
-            )
+            # Send the message
+            try:
+                await channel.send(embed=embed)
+                print(f"Boost thank you message sent for {after.name}")
+            except Exception as e:
+                print(f"Error sending boost message: {e}")
 
 @bot.command(name='color', help='Generate random colors')
 async def color_command(ctx, count: int = 5):
