@@ -10,6 +10,7 @@ load_dotenv()
 # Get bot token from environment
 TOKEN = os.getenv('DISCORD_TOKEN')
 OWNER_ID = 1167122755800547483  # Direct ID - hardcoded
+BOOST_CHANNEL_ID = 1464032809646817373  # Channel for boost messages
 
 # Payment addresses configuration
 PAYMENT_ADDRESSES = {
@@ -157,6 +158,31 @@ async def on_ready():
     """Called when bot successfully logs in"""
     print(f'{bot.user} has connected to Discord!')
     print('------')
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    """Detect when a member boosts the server"""
+    try:
+        # Check if the member just started boosting
+        if before.premium_since is None and after.premium_since is not None:
+            # Member just boosted the server
+            channel = bot.get_channel(BOOST_CHANNEL_ID)
+            
+            if channel:
+                # Create embed with boost message
+                embed = discord.Embed(
+                    title="⭐ Thank You for Boosting!",
+                    description="Iti multumim pentru boost ⭐ Speram sa ai o zi buna !",
+                    color=discord.Color.pink()
+                )
+                embed.set_author(name=after.name, icon_url=after.avatar.url if after.avatar else None)
+                embed.set_image(url="https://cdn.discordapp.com/attachments/1085405953949298738/1251891408589381642/boost_card.png")
+                
+                # Send the message
+                await channel.send(embed=embed)
+                print(f"Boost thank you message sent for {after.name}")
+    except Exception as e:
+        print(f"Error in boost handler: {e}")
 
 @bot.command(name='color', help='Generate random colors')
 async def color_command(ctx, count: int = 5):
