@@ -1,12 +1,70 @@
--- OG Spawn Notification Script for Roblox
+-- OG Spawn Notification Script for Roblox with Discord Integration
 -- Place this in ServerScriptService
 
 local Players = game:GetService("Players")
 local Workspace = game:GetWorkspace()
+local HttpService = game:GetService("HttpService")
 
 -- Configuration
 local OG_MODEL_NAME = "OG" -- Change this to your OG model name
 local NOTIFICATION_DURATION = 10 -- Seconds
+local DISCORD_WEBHOOK_URL = "YOUR_WEBHOOK_URL_HERE" -- Replace with your Discord webhook URL
+local DISCORD_CHANNEL_ID = "1526978299325321340"
+
+-- Function to send message to Discord
+local function sendDiscordNotification(username, userId, timestamp, location)
+    if not DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL == "YOUR_WEBHOOK_URL_HERE" then
+        print("WARNING: Discord webhook URL not configured!")
+        return
+    end
+    
+    local embedData = {
+        embeds = {
+            {
+                title = "🎮 OG Spawned!",
+                description = "An OG has just spawned in the game!",
+                color = 16711680, -- Red color
+                fields = {
+                    {
+                        name = "Username",
+                        value = username,
+                        inline = true
+                    },
+                    {
+                        name = "User ID",
+                        value = tostring(userId),
+                        inline = true
+                    },
+                    {
+                        name = "Time",
+                        value = timestamp,
+                        inline = false
+                    },
+                    {
+                        name = "Location",
+                        value = location,
+                        inline = false
+                    }
+                },
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+            }
+        }
+    }
+    
+    local success, response = pcall(function()
+        return HttpService:PostAsync(
+            DISCORD_WEBHOOK_URL,
+            HttpService:JSONEncode(embedData),
+            Enum.HttpContentType.ApplicationJson
+        )
+    end)
+    
+    if success then
+        print("✅ Discord notification sent successfully!")
+    else
+        print("❌ Failed to send Discord notification: " .. tostring(response))
+    end
+end
 
 -- Function to create and display spawn notification
 local function notifyOGSpawn(ogModel, player)
@@ -27,14 +85,11 @@ local function notifyOGSpawn(ogModel, player)
         ogModel.Name
     )
     
-    -- Broadcast to all players
+    -- Broadcast to server console
     print(message)
     
-    -- Optional: Send message to chat if you have a chat system
-    if player:FindFirstChild("Backpack") then
-        -- Send to player's chat (requires chat system setup)
-        game:GetService("Chat"):Chat(ogModel, message, Enum.ChatColor.Blue)
-    end
+    -- Send to Discord
+    sendDiscordNotification(username, userId, timestamp, ogModel.Name)
 end
 
 -- Function to detect OG spawns
@@ -60,7 +115,7 @@ local function onOGSpawned(ogModel)
     end
 end
 
--- Monitor for OG spawns
+-- Function to monitor for OG spawns
 local function monitorOGSpawns()
     Workspace.ChildAdded:Connect(function(child)
         if child.Name == OG_MODEL_NAME then
@@ -80,3 +135,4 @@ for _, child in pairs(Workspace:GetChildren()) do
 end
 
 print("OG Spawn Notification system initialized!")
+print("Discord Channel ID: " .. DISCORD_CHANNEL_ID)
