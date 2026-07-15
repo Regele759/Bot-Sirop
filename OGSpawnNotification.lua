@@ -8,7 +8,7 @@ local HttpService = game:GetService("HttpService")
 -- Configuration
 local OG_MODEL_NAME = "OG" -- Change this to your OG model name
 local NOTIFICATION_DURATION = 10 -- Seconds
-local DISCORD_WEBHOOK_URL = "YOUR_WEBHOOK_URL_HERE" -- Replace with your Discord webhook URL
+local DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1526981760964104262/vgalYOtRRi6094q_EoXliHAGVfXQmbbQTd34VbKM_lMpFyOPk--y7x2KBgvim1aUNt6K"
 local DISCORD_CHANNEL_ID = "1526978299325321340"
 
 -- Function to send message to Discord
